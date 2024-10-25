@@ -1,78 +1,58 @@
 pipeline {
     agent any
-
     stages {
-        // Estágio de Build
         stage('Build') {
             steps {
                 script {
                     echo 'Baixando a aplicação e instalando dependências...'
                     sh '''
-                    DEV_DIR="./dev"
-                    GIT_REPO="git@github.com:PyroPapyrus/API-livros-automatizacao.git"
-                    
-                    # Criando a pasta dev se ela não existir
-                    if [ ! -d "$DEV_DIR" ]; then
-                        echo "Criando pasta $DEV_DIR..."
-                        mkdir "$DEV_DIR"
-                    fi
-                    
-                    # Baixando o código do repositório GIT
-                    cd "$DEV_DIR"
-                    git pull origin main
-                    if [ $? -ne 0 ]; then
-                        echo "Erro ao baixar a aplicação do GIT."
-                        exit 1
-                    fi
-                    
-                    # Criando ambiente virtual e instalando dependências
-                    python3 -m venv apiBooks
-                    . apiBooks/bin/activate  # Substituímos 'source' por '.'
-                    pip install -r requirements.txt
+                        DEV_DIR=./dev
+                        GIT_REPO=git@github.com:PyroPapyrus/API-livros-automatizacao.git
+                        
+                        if [ ! -d "$DEV_DIR" ]; then
+                            echo "Criando pasta $DEV_DIR..."
+                            mkdir "$DEV_DIR"
+                        fi
+                        
+                        cd "$DEV_DIR"
+                        git pull origin main
+                        
+                        python3 -m venv apiBooks
+                        . apiBooks/bin/activate
                     '''
                 }
             }
         }
-
-        // Estágio de Deploy
         stage('Deploy') {
             steps {
                 script {
-                    echo 'Iniciando o processo de Deploy...'
+                    echo 'Realizando o deploy...'
                     sh '''
-                    DEV_DIR="./dev"
-                    PROD_DIR="./prod"
-                    VENV_DIR="$DEV_DIR/apiBooks"
-                    APP_PROCESS="apiBooksClass.py"
-                    
-                    # Matando o processo da aplicação se estiver rodando
-                    PID=$(pgrep -f "$APP_PROCESS")
-                    if [ -n "$PID" ]; then
-                        echo "Matando processo $APP_PROCESS com PID $PID..."
-                        kill -9 "$PID"
-                    fi
-                    
-                    # Limpando o diretório prod
-                    if [ ! -d "$PROD_DIR" ]; then
-                        mkdir "$PROD_DIR"
-                    fi
-                    rm -rf $PROD_DIR/*
-                    
-                    # Copiando os arquivos do dev para o prod
-                    cp -r $DEV_DIR/* $PROD_DIR/
-                    
-                    # Ativando o ambiente virtual
-                    cd $PROD_DIR
-                    . $VENV_DIR/bin/activate  # Substituímos 'source' por '.'
-                    
-                    # Iniciando a aplicação
-                    nohup python3 $APP_PROCESS &
+                        PROD_DIR=./prod
+                        APP_PROCESS=apiBooksClass.py
+                        
+                        if [ ! -d "$PROD_DIR" ]; then
+                            echo "Criando pasta $PROD_DIR..."
+                            mkdir "$PROD_DIR"
+                        fi
+                        
+                        if pgrep -f "$APP_PROCESS"; then
+                            echo "Matando o processo $APP_PROCESS..."
+                            pkill -f "$APP_PROCESS"
+                        fi
+                        
+                        rm -rf "$PROD_DIR/*"
+                        cp -r "$DEV_DIR/"* "$PROD_DIR/"
+                        
+                        cd "$PROD_DIR"
+                        . ../dev/apiBooks/bin/activate
+                        
+                        nohup python3 apiBooksClass.py &
                     '''
                 }
             }
         }
     }
-
     post {
         always {
             echo 'Pipeline finalizado.'
