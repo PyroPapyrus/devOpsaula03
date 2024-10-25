@@ -1,62 +1,70 @@
 pipeline {
     agent any
+
+    environment {
+        DEV_DIR = './dev'
+        PROD_DIR = './prod'
+        GIT_REPO = 'git@github.com:PyroPapyrus/API-livros-automatizacao.git'
+    }
+
     stages {
-        stage('Build') {
+        stage('Checkout') {
             steps {
                 script {
-                    echo 'Baixando a aplicação e instalando dependências...'
-                    sh '''
-                        DEV_DIR=./dev
-                        GIT_REPO=git@github.com:PyroPapyrus/API-livros-automatizacao.git
-                        
-                        if [ ! -d "$DEV_DIR" ]; then
-                            echo "Criando pasta $DEV_DIR..."
-                            mkdir "$DEV_DIR"
-                        fi
-                        
-                        cd "$DEV_DIR"
-                        git pull origin main
-                        
-                        python3 -m venv apiBooks
-                        . apiBooks/bin/activate
-                    '''
+                    // Criar o diretório dev se não existir
+                    if (!fileExists(DEV_DIR)) {
+                        sh "mkdir -p ${DEV_DIR}"
+                    }
+
+                    // Baixar a aplicação do repositório GIT
+                    dir(DEV_DIR) {
+                        sh "git pull origin main || git clone ${GIT_REPO} ."
+                    }
                 }
             }
         }
+
+        stage('Build') {
+            steps {
+                script {
+                    // Criar ambiente virtual
+                    sh "python3 -m venv ${DEV_DIR}/apiBooks"
+                    // Ativar o ambiente virtual
+                    sh ". ${DEV_DIR}/apiBooks/bin/activate"
+                    // Instalar dependências, se o requirements.txt estiver presente
+                    if (fileExists("${DEV_DIR}/requirements.txt")) {
+                        sh "pip install -r ${DEV_DIR}/requirements.txt"
+                    } else {
+                        echo "requirements.txt não encontrado. Pulando a instalação de dependências."
+                    }
+                }
+            }
+        }
+
         stage('Deploy') {
             steps {
                 script {
-                    echo 'Realizando o deploy...'
-                    sh '''
-                        PROD_DIR=./prod
-                        APP_PROCESS=apiBooksClass.py
-                        
-                        if [ ! -d "$PROD_DIR" ]; then
-                            echo "Criando pasta $PROD_DIR..."
-                            mkdir "$PROD_DIR"
-                        fi
-                        
-                        if pgrep -f "$APP_PROCESS"; then
-                            echo "Matando o processo $APP_PROCESS..."
-                            pkill -f "$APP_PROCESS"
-                        fi
-                        
-                        rm -rf "$PROD_DIR/*"
-                        cp -r "$DEV_DIR/"* "$PROD_DIR/"
-                        
-                        cd "$PROD_DIR"
-                        . ../dev/apiBooks/bin/activate
-                        
-                        nohup python3 apiBooksClass.py &
-                    '''
+                    // Remover arquivos antigos da pasta prod
+                    sh "rm -rf ${PROD_DIR}/*"
+                    
+                    // Copiar arquivos do diretório dev para prod
+                    sh "cp -r ${DEV_DIR}/* ${PROD_DIR}/"
+
+                    // Ativar o ambiente virtual e executar a aplicação
+                    dir(PROD_DIR) {
+                        sh ". ${DEV_DIR}/apiBooks/bin/activate && nohup python3 apiBooksClass.py &"
+                    }
                 }
             }
         }
     }
+
     post {
         always {
             echo 'Pipeline finalizado.'
         }
+        failure {
+            echo 'Ocorreu um erro durante o pipeline.'
+        }
     }
 }
-
