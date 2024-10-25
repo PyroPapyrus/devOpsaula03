@@ -7,7 +7,6 @@ pipeline {
             steps {
                 script {
                     echo 'Baixando a aplicação e instalando dependências...'
-                    // Baixando a aplicação do Git e instalando o ambiente virtual
                     sh '''
                     DEV_DIR="./dev"
                     GIT_REPO="git@github.com:PyroPapyrus/API-livros-automatizacao.git"
@@ -28,7 +27,7 @@ pipeline {
                     
                     # Criando ambiente virtual e instalando dependências
                     python3 -m venv apiBooks
-                    source apiBooks/bin/activate
+                    . apiBooks/bin/activate  # Substituímos 'source' por '.'
                     pip install -r requirements.txt
                     '''
                 }
@@ -64,7 +63,7 @@ pipeline {
                     
                     # Ativando o ambiente virtual
                     cd $PROD_DIR
-                    source $VENV_DIR/bin/activate
+                    . $VENV_DIR/bin/activate  # Substituímos 'source' por '.'
                     
                     # Iniciando a aplicação
                     nohup python3 $APP_PROCESS &
